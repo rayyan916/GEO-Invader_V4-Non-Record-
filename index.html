@@ -1,0 +1,1163 @@
+<!DOCTYPE html>
+<html lang="zh-HK">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Geography Invader 地理侵略者 - HKDSE 構造地貌</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@500;700&family=Press+Start+2P&family=Noto+Sans+TC:wght@500;700;900&display=swap" rel="stylesheet">
+  <style>
+    body {
+      font-family: 'Noto Sans TC', sans-serif;
+      background-color: #0b0f19;
+      color: #fff;
+      touch-action: manipulation;
+      user-select: none;
+      -webkit-user-select: none;
+      overflow: hidden;
+    }
+    .arcade-font {
+      font-family: 'Press Start 2P', cursive;
+    }
+    .tech-font {
+      font-family: 'Chakra Petch', sans-serif;
+    }
+    /* Retro CRT Filter Effect */
+    .crt::after {
+      content: " ";
+      display: block;
+      position: absolute;
+      top: 0; left: 0; bottom: 0; right: 0;
+      background: linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.25) 50%), linear-gradient(90deg, rgba(255, 0, 0, 0.03), rgba(0, 255, 0, 0.01), rgba(0, 0, 255, 0.03));
+      z-index: 20;
+      background-size: 100% 3px, 6px 100%;
+      pointer-events: none;
+    }
+    /* Glow Effects */
+    .glow-green {
+      text-shadow: 0 0 8px rgba(74, 222, 128, 0.8);
+    }
+    .glow-gold {
+      text-shadow: 0 0 10px rgba(250, 204, 21, 0.9);
+    }
+    .glow-red {
+      text-shadow: 0 0 8px rgba(248, 113, 113, 0.8);
+    }
+    /* Custom Scrollbar for Leaderboard */
+    ::-webkit-scrollbar {
+      width: 6px;
+    }
+    ::-webkit-scrollbar-track {
+      background: #111827;
+    }
+    ::-webkit-scrollbar-thumb {
+      background: #374151;
+      border-radius: 3px;
+    }
+  </style>
+</head>
+<body class="flex flex-col items-center justify-center min-h-screen p-0 m-0 bg-slate-950 crt select-none">
+
+  <!-- Main Responsive Container -->
+  <div id="game-container" class="relative w-full max-w-md h-screen md:h-[880px] bg-slate-900 border-0 md:border-4 border-amber-500/40 md:rounded-2xl shadow-2xl flex flex-col overflow-hidden">
+    
+    <!-- TOP HUD: Stats Bar -->
+    <header id="hud-bar" class="hidden z-10 bg-slate-950/90 border-b border-amber-500/30 p-2.5 flex flex-col gap-1.5 backdrop-blur-sm shrink-0">
+      <div class="flex justify-between items-center text-xs tech-font">
+        <!-- Player Info & HP -->
+        <div class="flex items-center gap-2">
+          <span id="hud-player-name" class="font-bold text-amber-400 max-w-[80px] truncate">PLAYER</span>
+          <div class="w-24 bg-slate-800 rounded-full h-3 border border-slate-700 overflow-hidden relative">
+            <div id="hp-bar" class="bg-emerald-500 h-full w-full transition-all duration-300"></div>
+            <span id="hp-text" class="absolute inset-0 flex items-center justify-center text-[9px] font-extrabold text-white drop-shadow">500 HP</span>
+          </div>
+        </div>
+
+        <!-- Score & Timer -->
+        <div class="flex items-center gap-3">
+          <div class="text-right">
+            <span class="text-slate-400 text-[10px] block leading-none">SCORE</span>
+            <span id="hud-score" class="text-amber-400 font-bold text-sm">0</span>
+          </div>
+          <div class="text-right">
+            <span class="text-slate-400 text-[10px] block leading-none">TIME</span>
+            <span id="hud-timer" class="text-cyan-400 font-bold text-sm">00:00</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Landform Title & Target Word Tracker -->
+      <div class="bg-slate-900/80 rounded border border-slate-700/80 p-1.5 text-center flex flex-col gap-1">
+        <div id="landform-title" class="text-amber-300 font-bold text-xs tracking-wide truncate">
+          載入中...
+        </div>
+        <!-- Targeted Character & Sequence Preview -->
+        <div class="flex items-center justify-center gap-1.5 text-xs">
+          <span class="text-slate-400 text-[10px] shrink-0">請尋找：</span>
+          <span id="target-char-display" class="bg-amber-500 text-slate-950 font-black px-2 py-0.5 rounded text-sm animate-pulse glow-gold shrink-0">
+            ?
+          </span>
+        </div>
+        <!-- Full Sentence Display Block -->
+        <div id="sentence-preview" class="text-slate-300 text-[11px] leading-snug text-left bg-slate-950/70 p-1.5 rounded border border-slate-800/80 max-h-16 overflow-y-auto break-all">
+          載入完整形成過程...
+        </div>
+      </div>
+    </header>
+
+    <!-- Canvas Game Viewport -->
+    <div class="relative flex-1 w-full bg-black overflow-hidden flex items-center justify-center">
+      <canvas id="gameCanvas" class="w-full h-full block bg-slate-950"></canvas>
+
+      <!-- Dynamic On-Canvas Floating Notice -->
+    <div id="toast-msg" class="absolute top-12 left-1/2 -translate-x-1/2 pointer-events-none transition-all duration-300 opacity-0 transform -translate-y-2 z-30">
+      <div id="toast-content" class="bg-amber-500/90 text-slate-950 font-black px-4 py-1.5 rounded-full text-xs shadow-lg flex items-center gap-1.5 backdrop-blur-sm">
+        <span>提示</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- TOUCH CONTROLS (Mobile Devices) -->
+  <div id="touch-controls" class="hidden z-10 bg-slate-950/95 border-t border-slate-800 p-2 text-center shrink-0">
+    <div class="flex justify-between items-center max-w-sm mx-auto gap-3">
+      <!-- 左手操作區：左右移動按鈕 -->
+      <div class="flex gap-2 flex-1">
+        <button id="btn-left" class="flex-1 bg-slate-800 active:bg-amber-600 border border-slate-700 active:border-amber-400 text-amber-300 py-3 rounded-lg font-bold text-xl active:scale-95 transition-transform flex items-center justify-center shadow-lg">
+          ◀
+        </button>
+        <button id="btn-right" class="flex-1 bg-slate-800 active:bg-amber-600 border border-slate-700 active:border-amber-400 text-amber-300 py-3 rounded-lg font-bold text-xl active:scale-95 transition-transform flex items-center justify-center shadow-lg">
+          ▶
+        </button>
+      </div>
+      <!-- 右手操作區：開火按鈕 -->
+      <button id="btn-fire" class="flex-1 bg-rose-600 active:bg-rose-500 border border-rose-400 text-white py-3 rounded-lg font-bold text-base active:scale-95 transition-transform shadow-lg glow-red">
+        開火 🚀
+      </button>
+    </div>
+  </div>
+
+  <!-- OVERLAY 1: Start Screen -->
+    <div id="start-modal" class="absolute inset-0 z-30 bg-slate-950/95 flex flex-col items-center justify-between p-6 overflow-y-auto">
+      <div class="w-full max-w-xs text-center my-auto flex flex-col items-center">
+        <!-- Arcade Title Logo -->
+        <div class="mb-4">
+          <div class="inline-block bg-gradient-to-r from-amber-500 via-rose-500 to-cyan-500 p-0.5 rounded-xl shadow-xl">
+            <div class="bg-slate-900 px-4 py-3 rounded-[10px]">
+              <p class="text-amber-400 text-[10px] arcade-font tracking-widest uppercase mb-1">HKDSE GEOGRAPHY</p>
+              <h1 class="text-2xl font-black text-transparent bg-clip-text bg-gradient-to-r from-amber-300 via-yellow-200 to-amber-500 tracking-wider">
+                GEOGRAPHY<br>INVADER
+              </h1>
+              <p class="text-cyan-400 text-xs font-bold mt-1 tracking-widest">地理侵略者：構造地貌</p>
+            </div>
+          </div>
+        </div>
+
+        <!-- Instructions Card -->
+        <div class="bg-slate-900/80 border border-slate-800 rounded-xl p-3 text-left text-xs text-slate-300 mb-5 w-full space-y-1.5 shadow-inner">
+          <p class="font-bold text-amber-400 flex items-center gap-1">
+            <span class="text-base">🎯</span> 任務指示：
+          </p>
+          <p>1. 敵機陣列藏有 HKDSE 構造地貌形成句子。</p>
+          <p>2. 控制 P-38 戰機按<span class="text-amber-300 font-bold">正確順序</span>射擊目標中文字。</p>
+          <p>3. 射錯字眼敵機將發射彈幕攻擊（扣 HP）。</p>
+          <p class="text-[11px] text-slate-400">操作：鍵盤 鍵盤 [←][→] / [A][D] 移動，[Space] 射擊。手機使用螢幕按鈕。</p>
+        </div>
+
+        <!-- Player Name Input -->
+        <div class="w-full mb-4 text-left">
+          <label class="block text-slate-400 text-xs mb-1 font-bold">輸入機師姓名 (Player Name):</label>
+          <input type="text" id="player-name-input" maxlength="12" placeholder="請輸入名字..." class="w-full bg-slate-900 border-2 border-amber-500/60 focus:border-amber-400 rounded-lg px-3 py-2 text-white font-bold text-sm outline-none transition-colors text-center shadow-lg">
+        </div>
+
+        <!-- Mode / Stage Selection -->
+        <div class="w-full mb-5 text-left">
+          <label class="block text-slate-400 text-xs mb-1 font-bold">選擇挑戰主題:</label>
+          <select id="stage-select" class="w-full bg-slate-900 border border-slate-700 focus:border-amber-400 rounded-lg px-3 py-2 text-amber-300 text-xs outline-none">
+            <option value="all">🎮 全程挑戰模式 (隨機關卡順序)</option>
+            <option value="0">1. 大洋中脊的形成過程</option>
+            <option value="1">2. 火山的形成 (擴張性板塊邊界)</option>
+            <option value="2">3. 裂谷的形成過程</option>
+            <option value="3">4. 海溝的形成過程</option>
+            <option value="4">5. 褶曲山形成 (大洋與大陸板塊)</option>
+            <option value="5">6. 火山的形成 (聚合性板塊邊界)</option>
+            <option value="6">7. 褶曲山形成 (兩塊大陸地殼)</option>
+          </select>
+        </div>
+
+        <!-- Action Buttons -->
+        <div class="w-full space-y-2">
+          <button id="btn-start-game" class="w-full bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-slate-950 font-black py-3 rounded-xl text-base shadow-lg shadow-amber-500/20 active:scale-95 transition-all">
+            開始戰鬥 🚀
+          </button>
+          <button id="btn-show-leaderboard" class="w-full bg-slate-800 hover:bg-slate-700 text-cyan-300 font-bold py-2 rounded-xl text-xs border border-slate-700 active:scale-95 transition-all">
+            🏆 查看英雄榜 (Leaderboard)
+          </button>
+        </div>
+      </div>
+
+      <div class="text-[10px] text-slate-500 text-center mt-2">
+        1943 Arcade Style • HKDSE Geography Interactive
+      </div>
+    </div>
+
+    <!-- OVERLAY 2: Leaderboard Modal -->
+    <div id="leaderboard-modal" class="hidden absolute inset-0 z-40 bg-slate-950/95 flex flex-col p-6">
+      <div class="flex justify-between items-center mb-4 border-b border-slate-800 pb-2">
+        <h2 class="text-amber-400 font-black text-lg flex items-center gap-2">
+          🏆 榮譽機師排行榜
+        </h2>
+        <button id="btn-close-leaderboard" class="text-slate-400 hover:text-white font-bold text-xl px-2">✕</button>
+      </div>
+
+      <div class="flex-1 overflow-y-auto mb-4 border border-slate-800 rounded-lg bg-slate-900/60 p-2">
+        <table class="w-full text-left text-xs">
+          <thead>
+            <tr class="border-b border-slate-700 text-slate-400 text-[10px]">
+              <th class="p-2">排名</th>
+              <th class="p-2">姓名</th>
+              <th class="p-2 text-right">得分</th>
+              <th class="p-2 text-right">用時</th>
+            </tr>
+          </thead>
+          <tbody id="leaderboard-rows" class="divide-y divide-slate-800/60">
+            <!-- Dynamic rows will be inserted here -->
+          </tbody>
+        </table>
+        <div id="no-records-msg" class="text-center text-slate-500 py-8 text-xs hidden">
+          暫無遊玩紀錄，快成為第一位登榜機師吧！
+        </div>
+      </div>
+
+      <button id="btn-clear-records" class="w-full bg-rose-950/60 hover:bg-rose-900 text-rose-300 border border-rose-800 font-bold py-2 rounded-xl text-xs transition-colors">
+        清除所有紀錄
+      </button>
+    </div>
+
+    <!-- OVERLAY 3: Stage Clear / Game Victory Modal -->
+    <div id="result-modal" class="hidden absolute inset-0 z-40 bg-slate-950/95 flex flex-col items-center justify-center p-6 text-center">
+      <div class="w-full max-w-xs bg-slate-900 border-2 border-amber-500/60 rounded-2xl p-5 shadow-2xl flex flex-col items-center">
+        <div id="result-icon" class="text-5xl mb-2">🎉</div>
+        <h2 id="result-title" class="text-xl font-black text-amber-400 mb-1">關卡完成！</h2>
+        <p id="result-subtitle" class="text-xs text-slate-300 mb-4">恭喜您成功掌握地貌形成過程</p>
+
+        <!-- Stats Breakdown -->
+        <div class="w-full bg-slate-950 rounded-xl p-3 border border-slate-800 space-y-2 text-xs mb-5 text-left">
+          <div class="flex justify-between">
+            <span class="text-slate-400">機師姓名：</span>
+            <span id="res-name" class="font-bold text-white">---</span>
+          </div>
+          <div class="flex justify-between">
+            <span class="text-slate-400">最終得分：</span>
+            <span id="res-score" class="font-bold text-amber-400 text-sm">0</span>
+          </div>
+          <div class="flex justify-between">
+            <span class="text-slate-400">總共用時：</span>
+            <span id="res-time" class="font-bold text-cyan-400">00:00</span>
+          </div>
+          <div class="flex justify-between">
+            <span class="text-slate-400">剩餘血量：</span>
+            <span id="res-hp" class="font-bold text-emerald-400">500 HP</span>
+          </div>
+        </div>
+
+        <div class="w-full space-y-2">
+          <button id="btn-next-stage" class="w-full bg-amber-500 hover:bg-amber-400 text-slate-950 font-black py-2.5 rounded-xl text-sm transition-all shadow-md">
+            下一關 ⏩
+          </button>
+          <button id="btn-restart-game" class="w-full bg-slate-800 hover:bg-slate-700 text-white font-bold py-2.5 rounded-xl text-xs border border-slate-700 transition-all">
+            返回主選單 🏠
+          </button>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- JavaScript Game Engine Script -->
+  <script>
+    const LANDFORM_DATASET = [
+      {
+        id: "mid_ocean_ridge",
+        title: "大洋中脊的形成過程",
+        sentence: "地幔中的上升對流令兩塊相鄰的板塊沿邊界分開。岩漿從地幔湧上，形成新的地殼。因為張力的關係，在該邊界會出現斷層作用（正斷層）。當兩塊大洋地殼互相分開，岩漿從板塊邊界湧上及凝固，形成一連串的海底山脈，稱為大洋中脊。"
+      },
+      {
+        id: "volcano_divergent",
+        title: "火山的形成過程 (擴張性板塊邊界)",
+        sentence: "地幔中的上升對流令兩塊相鄰的板塊沿邊界分開。岩漿從地幔湧上，形成新的地殼。因為張力的關係，在該邊界會出現斷層作用（正斷層）。當岩漿沿弱線湧上，形成火山（或海底火山）。"
+      },
+      {
+        id: "rift_valley",
+        title: "裂谷的形成過程 (擴張性板塊邊界)",
+        sentence: "地幔中的上升對流令兩塊相鄰的板塊沿邊界分開。岩漿從地幔湧上，形成新的地殼。因為張力的關係，在該邊界會出現斷層作用（正斷層）。斷層作用會令中間的地塊因重力而下沉，形成裂谷。"
+      },
+      {
+        id: "trench",
+        title: "海溝的形成過程",
+        sentence: "地幔中的下降對流令兩個地殼沿邊界聚合。因大洋地殼的密度較高，地殼邊緣會俯衝至大陸地殼的之下，形成俯衝帶。大洋地殼邊緣的岩石會被地幔中的岩漿熔融。因為擠壓力的關係，在該邊界會出現斷層作用（逆斷層）。海溝會沿著俯衝帶形成。"
+      },
+      {
+        id: "fold_mountain_oceanic_continental",
+        title: "褶曲山的形成過程 (大洋地殼與大陸地殼之間)",
+        sentence: "地幔中的下降對流令兩個地殼沿邊界聚合。因大洋地殼的密度較高，地殼邊緣會俯衝至大陸地殼的之下，形成俯衝帶。大洋地殼邊緣的岩石會被地幔中的岩漿熔融。因為擠壓力的關係，在該邊界會出現斷層作用（逆斷層）。海溝會沿著俯衝帶形成。地殼會將一些岩石帶到海溝沉積，形成沉積物。沉積物漸漸堆積成層，壓實成沉積岩。因地殼不斷聚合，被帶到海溝的沉積岩受擠壓並褶曲，形成褶曲山。"
+      },
+      {
+        id: "volcano_convergent",
+        title: "火山的形成過程 (聚合性板塊邊界)",
+        sentence: "地幔中的下降對流令兩個地殼沿邊界聚合。因大洋地殼的密度較高，地殼邊緣會俯衝至大陸地殼的之下，形成俯衝帶。大洋地殼邊緣的岩石會被地幔中的岩漿熔融。因為擠壓力的關係，在該邊界會出現斷層作用（逆斷層）。在俯衝帶的熔融物質，由於密度比地幔中的物質低，這些岩漿會沿弱線上升至地面，形成火山（或海底火山、火山島）。"
+      },
+      {
+        id: "fold_mountain_continental_continental",
+        title: "褶曲山的形成過程 (兩塊大陸地殼之間)",
+        sentence: "地幔中的下降對流令兩個大陸地殼沿邊界聚合。由於兩塊大陸地殼密度相近，沒有一方俯衝到軟流圈。但會將地殼之間的沉積層受壓並褶曲。因為長時間的受壓及褶曲，沉積層會被抬升成褶曲山。"
+      }
+    ];
+
+    class ArcadeAudioEngine {
+      constructor() {
+        this.ctx = null;
+        this.muted = false;
+      }
+      init() {
+        if (!this.ctx) {
+          const AudioContext = window.AudioContext || window.webkitAudioContext;
+          this.ctx = new AudioContext();
+        }
+        if (this.ctx.state === 'suspended') {
+          this.ctx.resume();
+        }
+      }
+      playLaser() {
+        if (!this.ctx || this.muted) return;
+        const osc = this.ctx.createOscillator();
+        const gain = this.ctx.createGain();
+        osc.type = 'sawtooth';
+        osc.frequency.setValueAtTime(800, this.ctx.currentTime);
+        osc.frequency.exponentialRampToValueAtTime(150, this.ctx.currentTime + 0.12);
+        gain.gain.setValueAtTime(0.15, this.ctx.currentTime);
+        gain.gain.linearRampToValueAtTime(0.01, this.ctx.currentTime + 0.12);
+        osc.connect(gain);
+        gain.connect(this.ctx.destination);
+        osc.start();
+        osc.stop(this.ctx.currentTime + 0.12);
+      }
+      playHitCorrect() {
+        if (!this.ctx || this.muted) return;
+        const now = this.ctx.currentTime;
+        [523.25, 659.25, 783.99, 1046.50].forEach((freq, idx) => {
+          const osc = this.ctx.createOscillator();
+          const gain = this.ctx.createGain();
+          osc.type = 'square';
+          osc.frequency.setValueAtTime(freq, now + idx * 0.05);
+          gain.gain.setValueAtTime(0.1, now + idx * 0.05);
+          gain.gain.linearRampToValueAtTime(0.01, now + (idx + 1) * 0.05);
+          osc.connect(gain);
+          gain.connect(this.ctx.destination);
+          osc.start(now + idx * 0.05);
+          osc.stop(now + (idx + 1) * 0.05);
+        });
+      }
+      playHitWrong() {
+        if (!this.ctx || this.muted) return;
+        const now = this.ctx.currentTime;
+        const osc = this.ctx.createOscillator();
+        const gain = this.ctx.createGain();
+        osc.type = 'sawtooth';
+        osc.frequency.setValueAtTime(160, now);
+        osc.frequency.linearRampToValueAtTime(60, now + 0.3);
+        gain.gain.setValueAtTime(0.25, now);
+        gain.gain.linearRampToValueAtTime(0.01, now + 0.3);
+        osc.connect(gain);
+        gain.connect(this.ctx.destination);
+        osc.start(now);
+        osc.stop(now + 0.3);
+      }
+      playStageClear() {
+        if (!this.ctx || this.muted) return;
+        const notes = [440, 554.37, 659.25, 880, 659.25, 880];
+        const times = [0, 0.12, 0.24, 0.36, 0.54, 0.66];
+        const now = this.ctx.currentTime;
+        notes.forEach((freq, i) => {
+          const osc = this.ctx.createOscillator();
+          const gain = this.ctx.createGain();
+          osc.type = 'triangle';
+          osc.frequency.setValueAtTime(freq, now + times[i]);
+          gain.gain.setValueAtTime(0.2, now + times[i]);
+          gain.gain.linearRampToValueAtTime(0.01, now + times[i] + 0.18);
+          osc.connect(gain);
+          gain.connect(this.ctx.destination);
+          osc.start(now + times[i]);
+          osc.stop(now + times[i] + 0.2);
+        });
+      }
+    }
+
+    const soundEngine = new ArcadeAudioEngine();
+
+    const COLS = 11;
+    const ROWS = 5;
+    const MAX_HP = 500;
+
+    let canvas, ctx;
+    let playerName = "機師";
+    let selectedStageIndex = 0; // 0-6 or 'all'
+    let currentStageQueue = [];
+    let currentStagePointer = 0;
+
+    let gameState = 'START'; // START, PLAYING, GAMEOVER, CLEAR
+    let playerHP = MAX_HP;
+    let score = 0;
+    let startTime = 0;
+    let elapsedTime = 0;
+    let timerInterval = null;
+
+    let currentSentenceData = null;
+    let rawSentenceChars = [];
+    let targetIndex = 0;
+
+    // Entities
+    let player = {
+      x: 0,
+      y: 0,
+      width: 36,
+      height: 38,
+      speed: 5,
+      isMovingLeft: false,
+      isMovingRight: false
+    };
+
+    let bullets = [];
+    let enemyBullets = [];
+    let particles = [];
+    let enemies = []; // 11x5 grid array
+
+    // Space Invader Grid Movement
+    let invaderDir = 1; // 1 = right, -1 = left
+    let invaderSpeed = 0.125; // 敵人移動速度再減慢一倍 (由 0.25 降至 0.125)
+    let invaderStepDown = 8;
+    let oceanOffset = 0;
+
+    window.addEventListener('DOMContentLoaded', () => {
+      canvas = document.getElementById('gameCanvas');
+      ctx = canvas.getContext('2d');
+
+      resizeCanvas();
+      window.addEventListener('resize', resizeCanvas);
+
+      // DOM Buttons & Modals
+      document.getElementById('btn-start-game').addEventListener('click', startGame);
+      document.getElementById('btn-show-leaderboard').addEventListener('click', showLeaderboard);
+      document.getElementById('btn-close-leaderboard').addEventListener('click', hideLeaderboard);
+      document.getElementById('btn-clear-records').addEventListener('click', clearLeaderboard);
+      document.getElementById('btn-restart-game').addEventListener('click', resetToMenu);
+      document.getElementById('btn-next-stage').addEventListener('click', startNextStage);
+
+      // Controls setup
+      setupControls();
+
+      // Check Mobile Device
+      if ('ontouchstart' in window || navigator.maxTouchPoints > 0) {
+        document.getElementById('touch-controls').classList.remove('hidden');
+      }
+
+      // Initial Canvas Render Loop
+      requestAnimationFrame(gameLoop);
+    });
+
+    function resizeCanvas() {
+      const container = document.getElementById('game-container');
+      const hud = document.getElementById('hud-bar');
+      const controls = document.getElementById('touch-controls');
+
+      let hudHeight = hud.classList.contains('hidden') ? 0 : hud.offsetHeight;
+      let ctrlHeight = controls.classList.contains('hidden') ? 0 : controls.offsetHeight;
+
+      canvas.width = container.clientWidth;
+      canvas.height = container.clientHeight - hudHeight - ctrlHeight;
+
+      if (player) {
+        player.y = canvas.height - 50;
+        player.x = Math.max(10, Math.min(canvas.width - player.width - 10, player.x || canvas.width / 2));
+      }
+    }
+
+    function setupControls() {
+      // Keyboard Controls
+      window.addEventListener('keydown', (e) => {
+        if (gameState !== 'PLAYING') return;
+        soundEngine.init();
+
+        if (e.key === 'ArrowLeft' || e.key === 'a' || e.key === 'A') {
+          player.isMovingLeft = true;
+        } else if (e.key === 'ArrowRight' || e.key === 'd' || e.key === 'D') {
+          player.isMovingRight = true;
+        } else if (e.key === ' ' || e.key === 'Spacebar') {
+          e.preventDefault();
+          fireBullet();
+        }
+      });
+
+      window.addEventListener('keyup', (e) => {
+        if (e.key === 'ArrowLeft' || e.key === 'a' || e.key === 'A') {
+          player.isMovingLeft = false;
+        } else if (e.key === 'ArrowRight' || e.key === 'd' || e.key === 'D') {
+          player.isMovingRight = false;
+        }
+      });
+
+      // Mobile Touch Controls
+      const btnLeft = document.getElementById('btn-left');
+      const btnRight = document.getElementById('btn-right');
+      const btnFire = document.getElementById('btn-fire');
+
+      const startLeft = (e) => { e.preventDefault(); soundEngine.init(); player.isMovingLeft = true; };
+      const stopLeft = (e) => { e.preventDefault(); player.isMovingLeft = false; };
+      btnLeft.addEventListener('touchstart', startLeft);
+      btnLeft.addEventListener('touchend', stopLeft);
+      btnLeft.addEventListener('mousedown', startLeft);
+      btnLeft.addEventListener('mouseup', stopLeft);
+
+      const startRight = (e) => { e.preventDefault(); soundEngine.init(); player.isMovingRight = true; };
+      const stopRight = (e) => { e.preventDefault(); player.isMovingRight = false; };
+      btnRight.addEventListener('touchstart', startRight);
+      btnRight.addEventListener('touchend', stopRight);
+      btnRight.addEventListener('mousedown', startRight);
+      btnRight.addEventListener('mouseup', stopRight);
+
+      const doFire = (e) => {
+        e.preventDefault();
+        soundEngine.init();
+        if (gameState === 'PLAYING') fireBullet();
+      };
+      btnFire.addEventListener('touchstart', doFire);
+      btnFire.addEventListener('click', doFire);
+
+      // Direct Canvas Touch Dragging for intuitive mobile aiming
+      canvas.addEventListener('touchmove', (e) => {
+        if (gameState !== 'PLAYING') return;
+        const touch = e.touches[0];
+        const rect = canvas.getBoundingClientRect();
+        const touchX = touch.clientX - rect.left;
+        player.x = Math.max(10, Math.min(canvas.width - player.width - 10, touchX - player.width / 2));
+      });
+    }
+
+    function startGame() {
+      soundEngine.init();
+
+      const nameInput = document.getElementById('player-name-input').value.trim();
+      playerName = nameInput || "匿名機師";
+
+      const stageSelectVal = document.getElementById('stage-select').value;
+      if (stageSelectVal === 'all') {
+        currentStageQueue = [0, 1, 2, 3, 4, 5, 6].sort(() => Math.random() - 0.5);
+      } else {
+        currentStageQueue = [parseInt(stageSelectVal)];
+      }
+
+      currentStagePointer = 0;
+      score = 0;
+      playerHP = MAX_HP;
+      startTime = Date.now();
+
+      document.getElementById('start-modal').classList.add('hidden');
+      document.getElementById('hud-bar').classList.remove('hidden');
+      resizeCanvas();
+
+      if (timerInterval) clearInterval(timerInterval);
+      timerInterval = setInterval(updateTimer, 1000);
+
+      initStage(currentStageQueue[currentStagePointer]);
+    }
+
+    function initStage(stageIdx) {
+      currentSentenceData = LANDFORM_DATASET[stageIdx];
+      // Strip spaces, keep raw characters
+      rawSentenceChars = currentSentenceData.sentence.replace(/\s+/g, '').split('');
+      targetIndex = 0;
+
+      // 重置血量為最大值 400 HP
+      playerHP = MAX_HP;
+
+      // Update HUD Text
+      document.getElementById('landform-title').innerText = `【關卡 ${currentStagePointer + 1}/${currentStageQueue.length}】${currentSentenceData.title}`;
+      updateTargetDisplay();
+      updateHPBar();
+
+      // Reset Player & Entities
+      player.x = canvas.width / 2 - player.width / 2;
+      player.y = canvas.height - 50;
+      bullets = [];
+      enemyBullets = [];
+      particles = [];
+
+      // Generate 11 x 5 Space Invaders enemy grid
+      generateEnemyGrid();
+
+      gameState = 'PLAYING';
+      showToast(`任務開始：射擊正確字眼！`, 'amber');
+    }
+
+    function generateEnemyGrid() {
+      enemies = [];
+      const totalGridSlots = COLS * ROWS;
+
+      // Determine remaining sentence characters from targetIndex
+      let remainingChars = rawSentenceChars.slice(targetIndex);
+
+      // Fill grid slots:
+      // Ensure the target character MUST appear at least 2-3 times in grid
+      let gridChars = [];
+      let currentTargetChar = rawSentenceChars[targetIndex] || "完";
+
+      // Add guaranteed targets
+      gridChars.push(currentTargetChar);
+      gridChars.push(currentTargetChar);
+
+      // Add next upcoming characters
+      let idx = 1;
+      while (gridChars.length < totalGridSlots) {
+        if (targetIndex + idx < rawSentenceChars.length) {
+          gridChars.push(rawSentenceChars[targetIndex + idx]);
+          idx++;
+        } else {
+          // If sentence end reached, pull random chars from the full sentence as decoys
+          let randChar = rawSentenceChars[Math.floor(Math.random() * rawSentenceChars.length)];
+          gridChars.push(randChar);
+        }
+      }
+
+      // Scramble grid per row
+      gridChars.sort(() => Math.random() - 0.5);
+
+      // Calculate Grid Layout dimensions
+      const startX = 15;
+      const startY = 15;
+      const cellWidth = (canvas.width - 30) / COLS;
+      const cellHeight = 32;
+
+      for (let r = 0; r < ROWS; r++) {
+        for (let c = 0; c < COLS; c++) {
+          let charIndex = r * COLS + c;
+          let char = gridChars[charIndex];
+
+          enemies.push({
+            row: r,
+            col: c,
+            x: startX + c * cellWidth,
+            y: startY + r * cellHeight,
+            width: cellWidth - 2,
+            height: cellHeight - 4,
+            char: char,
+            alive: true,
+            colorType: r % 2 === 0 ? 'green' : 'red' // 1943 style enemy colored variants
+          });
+        }
+      }
+
+      invaderDir = 1;
+    }
+
+    function replenishEnemyGridIfNeeded() {
+      // If living enemies count < 15, or target char is missing in alive enemies, replenish dynamically!
+      let aliveEnemies = enemies.filter(e => e.alive);
+      let targetChar = rawSentenceChars[targetIndex];
+
+      let hasTargetChar = aliveEnemies.some(e => e.char === targetChar);
+
+      if (aliveEnemies.length < 12 || !hasTargetChar) {
+        generateEnemyGrid();
+        showToast("敵機艦隊補給降臨！", "cyan");
+      }
+    }
+
+    function fireBullet() {
+      bullets.push({
+        x: player.x + player.width / 2 - 2,
+        y: player.y,
+        width: 4,
+        height: 12,
+        speed: 9
+      });
+      soundEngine.playLaser();
+    }
+
+    function enemyCounterAttack(enemy) {
+      enemyBullets.push({
+        x: enemy.x + enemy.width / 2,
+        y: enemy.y + enemy.height,
+        width: 6,
+        height: 10,
+        speed: 3.5 + Math.random() * 1.5
+      });
+    }
+
+    function update() {
+      if (gameState !== 'PLAYING') return;
+
+      oceanOffset = (oceanOffset + 1) % 64;
+
+      // 1. Player Movement
+      if (player.isMovingLeft) {
+        player.x = Math.max(8, player.x - player.speed);
+      }
+      if (player.isMovingRight) {
+        player.x = Math.min(canvas.width - player.width - 8, player.x + player.speed);
+      }
+
+      // 2. Move Space Invader Grid
+      let shiftDown = false;
+      let minX = Infinity, maxX = -Infinity;
+
+      enemies.forEach(e => {
+        if (e.alive) {
+          if (e.x < minX) minX = e.x;
+          if (e.x + e.width > maxX) maxX = e.x + e.width;
+        }
+      });
+
+      if (maxX >= canvas.width - 8 && invaderDir === 1) {
+        invaderDir = -1;
+        shiftDown = true;
+      } else if (minX <= 8 && invaderDir === -1) {
+        invaderDir = 1;
+        shiftDown = true;
+      }
+
+      enemies.forEach(e => {
+        if (e.alive) {
+          e.x += invaderDir * invaderSpeed;
+          if (shiftDown) {
+            e.y += invaderStepDown;
+          }
+
+          // If invaders reach player line -> Penalty
+          if (e.y + e.height >= player.y - 10) {
+            damagePlayer(15, "敵機壓境！扣除 15 HP");
+            generateEnemyGrid();
+          }
+        }
+      });
+
+      // 3. Update Player Bullets & Collision Check
+      for (let i = bullets.length - 1; i >= 0; i--) {
+        let b = bullets[i];
+        b.y -= b.speed;
+
+        let bulletHit = false;
+
+        // Check collision with alive enemies
+        for (let j = 0; j < enemies.length; j++) {
+          let e = enemies[j];
+          if (e.alive &&
+              b.x < e.x + e.width &&
+              b.x + b.width > e.x &&
+              b.y < e.y + e.height &&
+              b.y + b.height > e.y) {
+
+            bulletHit = true;
+            e.alive = false;
+            createExplosion(e.x + e.width / 2, e.y + e.height / 2, e.char === rawSentenceChars[targetIndex] ? '#f59e0b' : '#ef4444');
+
+            // JUDGE SHOT CHARACTER:
+            let expectedChar = rawSentenceChars[targetIndex];
+
+            if (e.char === expectedChar) {
+              // CORRECT HIT!
+              score += 100;
+              document.getElementById('hud-score').innerText = score;
+              soundEngine.playHitCorrect();
+
+              targetIndex++;
+              updateTargetDisplay();
+
+              // Check if sentence complete
+              if (targetIndex >= rawSentenceChars.length) {
+                stageCleared();
+                return;
+              } else {
+                replenishEnemyGridIfNeeded();
+              }
+            } else {
+              // WRONG HIT! Enemy Counter Attacks!
+              soundEngine.playHitWrong();
+              showToast(`射錯「${e.char}」！扣 1 HP`, 'red');
+              enemyCounterAttack(e);
+              damagePlayer(1, `選錯字眼 -1 HP`);
+            }
+            break;
+          }
+        }
+
+        if (bulletHit || b.y < -20) {
+          bullets.splice(i, 1);
+        }
+      }
+
+      // 4. Update Enemy Bullets
+      for (let i = enemyBullets.length - 1; i >= 0; i--) {
+        let eb = enemyBullets[i];
+        eb.y += eb.speed;
+
+        // Check hit player
+        if (eb.x < player.x + player.width &&
+            eb.x + eb.width > player.x &&
+            eb.y < player.y + player.height &&
+            eb.y + eb.height > player.y) {
+
+          enemyBullets.splice(i, 1);
+          createExplosion(player.x + player.width / 2, player.y + player.height / 2, '#f87171');
+          damagePlayer(1, "被反擊彈幕擊中 -1 HP");
+          continue;
+        }
+
+        if (eb.y > canvas.height + 20) {
+          enemyBullets.splice(i, 1);
+        }
+      }
+
+      // 5. Update Particle Effects
+      for (let i = particles.length - 1; i >= 0; i--) {
+        let p = particles[i];
+        p.x += p.vx;
+        p.y += p.vy;
+        p.alpha -= 0.03;
+        if (p.alpha <= 0) particles.splice(i, 1);
+      }
+    }
+
+    function render() {
+      // Clear Background (Deep Navy Blue / Sea)
+      ctx.fillStyle = '#070d19';
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+      // 1. Draw Scrolling Ocean Water Grid Patterns (1943 Style)
+      ctx.strokeStyle = 'rgba(30, 58, 138, 0.25)';
+      ctx.lineWidth = 1;
+      for (let y = (oceanOffset % 32) - 32; y < canvas.height; y += 32) {
+        ctx.beginPath();
+        ctx.moveTo(0, y);
+        ctx.lineTo(canvas.width, y);
+        ctx.stroke();
+      }
+
+      if (gameState !== 'PLAYING' && gameState !== 'CLEAR') return;
+
+      // 2. Draw Enemies & Character Badges
+      enemies.forEach(e => {
+        if (!e.alive) return;
+
+        // Enemy Fighter Sprite Shape (Retro 1943 Pixel Plane)
+        ctx.fillStyle = e.colorType === 'green' ? '#15803d' : '#b91c1c';
+        ctx.fillRect(e.x + 2, e.y + 4, e.width - 4, e.height - 12);
+
+        // Wings
+        ctx.fillStyle = e.colorType === 'green' ? '#22c55e' : '#f87171';
+        ctx.fillRect(e.x, e.y + 10, e.width, 6);
+
+        // Cockpit
+        ctx.fillStyle = '#38bdf8';
+        ctx.fillRect(e.x + e.width / 2 - 2, e.y + 2, 4, 6);
+
+        // Text Badge Plate
+        ctx.fillStyle = '#0f172a';
+        ctx.fillRect(e.x + 1, e.y + e.height - 14, e.width - 2, 14);
+        ctx.strokeStyle = e.char === rawSentenceChars[targetIndex] ? '#f59e0b' : '#334155';
+        ctx.lineWidth = 1;
+        ctx.strokeRect(e.x + 1, e.y + e.height - 14, e.width - 2, 14);
+
+        // Chinese Character
+        ctx.fillStyle = e.char === rawSentenceChars[targetIndex] ? '#fbbf24' : '#f8fafc';
+        ctx.font = '900 11px "Noto Sans TC", sans-serif';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText(e.char, e.x + e.width / 2, e.y + e.height - 7);
+      });
+
+      // 3. Draw Player Aircraft (P-38 Lightning Twin-Boom Style)
+      drawPlayerAircraft(player.x, player.y, player.width, player.height);
+
+      // 4. Draw Bullets
+      ctx.fillStyle = '#fbbf24'; // Player yellow lasers
+      bullets.forEach(b => {
+        ctx.fillRect(b.x, b.y, b.width, b.height);
+        ctx.fillStyle = '#ffffff';
+        ctx.fillRect(b.x + 1, b.y + 2, b.width - 2, b.height - 4);
+      });
+
+      // Enemy Red Plasma Bullets
+      ctx.fillStyle = '#ef4444';
+      enemyBullets.forEach(eb => {
+        ctx.beginPath();
+        ctx.arc(eb.x, eb.y, 4, 0, Math.PI * 2);
+        ctx.fill();
+      });
+
+      // 5. Draw Particle Explosions
+      particles.forEach(p => {
+        ctx.save();
+        ctx.globalAlpha = p.alpha;
+        ctx.fillStyle = p.color;
+        ctx.fillRect(p.x, p.y, p.size, p.size);
+        ctx.restore();
+      });
+    }
+
+    function drawPlayerAircraft(x, y, w, h) {
+      // Main Fuselage & Cockpit
+      ctx.fillStyle = '#0284c7'; // Dark Cyan Body
+      ctx.fillRect(x + w / 2 - 3, y, 6, h);
+
+      // Twin Booms (P-38 classic look)
+      ctx.fillStyle = '#0369a1';
+      ctx.fillRect(x + 4, y + 10, 5, h - 10);
+      ctx.fillRect(x + w - 9, y + 10, 5, h - 10);
+
+      // Main Wings
+      ctx.fillStyle = '#38bdf8';
+      ctx.fillRect(x, y + 14, w, 8);
+
+      // Cockpit Glass
+      ctx.fillStyle = '#f0f9ff';
+      ctx.fillRect(x + w / 2 - 2, y + 8, 4, 8);
+
+      // Propeller Thruster Flare Animation
+      if (Math.random() > 0.3) {
+        ctx.fillStyle = '#f59e0b';
+        ctx.fillRect(x + 5, y + h, 3, 5);
+        ctx.fillRect(x + w - 8, y + h, 3, 5);
+      }
+    }
+
+    function gameLoop() {
+      update();
+      render();
+      requestAnimationFrame(gameLoop);
+    }
+
+    function damagePlayer(amount, msg) {
+      playerHP = Math.max(0, playerHP - amount);
+      updateHPBar();
+
+      if (msg) showToast(msg, 'red');
+
+      if (playerHP <= 0) {
+        gameOver();
+      }
+    }
+
+    function updateHPBar() {
+      const hpBar = document.getElementById('hp-bar');
+      const hpText = document.getElementById('hp-text');
+      const percentage = (playerHP / MAX_HP) * 100;
+
+      hpBar.style.width = `${percentage}%`;
+      hpText.innerText = `${playerHP} HP`;
+
+      if (percentage > 50) {
+        hpBar.className = 'bg-emerald-500 h-full transition-all duration-300';
+      } else if (percentage > 25) {
+        hpBar.className = 'bg-amber-500 h-full transition-all duration-300';
+      } else {
+        hpBar.className = 'bg-rose-600 h-full transition-all duration-300';
+      }
+    }
+
+    function updateTargetDisplay() {
+      const targetDisplay = document.getElementById('target-char-display');
+      const sentencePreview = document.getElementById('sentence-preview');
+
+      if (targetIndex < rawSentenceChars.length) {
+        targetDisplay.innerText = rawSentenceChars[targetIndex];
+
+        // Format FULL sentence text with active & completed character highlighting
+        let doneText = rawSentenceChars.slice(0, targetIndex).join('');
+        let currentTargetChar = rawSentenceChars[targetIndex];
+        let remainingText = rawSentenceChars.slice(targetIndex + 1).join('');
+
+        sentencePreview.innerHTML = `<span class="text-emerald-400 font-medium">${doneText}</span><span class="bg-amber-500/30 text-amber-300 font-bold px-0.5 rounded underline border border-amber-400/50 glow-gold">${currentTargetChar}</span><span class="text-slate-400">${remainingText}</span>`;
+      } else {
+        targetDisplay.innerText = '✔';
+        sentencePreview.innerHTML = `<span class="text-emerald-400 font-bold">${rawSentenceChars.join('')}</span> <span class="text-amber-300 font-bold">(句子完成！)</span>`;
+      }
+    }
+
+    function updateTimer() {
+      if (gameState !== 'PLAYING') return;
+      elapsedTime = Math.floor((Date.now() - startTime) / 1000);
+      let mins = Math.floor(elapsedTime / 60).toString().padStart(2, '0');
+      let secs = (elapsedTime % 60).toString().padStart(2, '0');
+      document.getElementById('hud-timer').innerText = `${mins}:${secs}`;
+    }
+
+    function createExplosion(x, y, color) {
+      for (let i = 0; i < 12; i++) {
+        particles.push({
+          x: x,
+          y: y,
+          vx: (Math.random() - 0.5) * 6,
+          vy: (Math.random() - 0.5) * 6,
+          size: Math.random() * 4 + 2,
+          color: color,
+          alpha: 1.0
+        });
+      }
+    }
+
+    function showToast(msg, colorType = 'amber') {
+      const toast = document.getElementById('toast-msg');
+      const content = document.getElementById('toast-content');
+
+      content.innerText = msg;
+      if (colorType === 'red') {
+        content.className = 'bg-rose-600 text-white font-black px-4 py-1.5 rounded-full text-xs shadow-lg flex items-center gap-1.5 backdrop-blur-sm';
+      } else if (colorType === 'cyan') {
+        content.className = 'bg-cyan-500 text-slate-950 font-black px-4 py-1.5 rounded-full text-xs shadow-lg flex items-center gap-1.5 backdrop-blur-sm';
+      } else {
+        content.className = 'bg-amber-500 text-slate-950 font-black px-4 py-1.5 rounded-full text-xs shadow-lg flex items-center gap-1.5 backdrop-blur-sm';
+      }
+
+      toast.classList.remove('opacity-0', '-translate-y-2');
+      toast.classList.add('opacity-100', 'translate-y-0');
+
+      setTimeout(() => {
+        toast.classList.remove('opacity-100', 'translate-y-0');
+        toast.classList.add('opacity-0', '-translate-y-2');
+      }, 1800);
+    }
+
+    function stageCleared() {
+      gameState = 'CLEAR';
+      soundEngine.playStageClear();
+
+      // Bonus Score for HP
+      score += playerHP * 5;
+
+      if (currentStagePointer + 1 < currentStageQueue.length) {
+        // More stages remaining
+        showResultModal(false);
+      } else {
+        // Victory All Stages Clear!
+        saveRecordToLeaderboard();
+        showResultModal(true);
+      }
+    }
+
+    function startNextStage() {
+      currentStagePointer++;
+      document.getElementById('result-modal').classList.add('hidden');
+      initStage(currentStageQueue[currentStagePointer]);
+    }
+
+    function gameOver() {
+      gameState = 'GAMEOVER';
+      if (timerInterval) clearInterval(timerInterval);
+      soundEngine.playHitWrong();
+
+      saveRecordToLeaderboard();
+
+      document.getElementById('result-icon').innerText = '💀';
+      document.getElementById('result-title').innerText = '戰機擊落！';
+      document.getElementById('result-subtitle').innerText = '血量歸零，請再接再厲！';
+
+      document.getElementById('res-name').innerText = playerName;
+      document.getElementById('res-score').innerText = score;
+      document.getElementById('res-time').innerText = document.getElementById('hud-timer').innerText;
+      document.getElementById('res-hp').innerText = `0 HP`;
+
+      document.getElementById('btn-next-stage').classList.add('hidden');
+      document.getElementById('result-modal').classList.remove('hidden');
+    }
+
+    function showResultModal(isFinalVictory) {
+      if (timerInterval) clearInterval(timerInterval);
+
+      document.getElementById('res-name').innerText = playerName;
+      document.getElementById('res-score').innerText = score;
+      document.getElementById('res-time').innerText = document.getElementById('hud-timer').innerText;
+      document.getElementById('res-hp').innerText = `${playerHP} HP`;
+
+      if (isFinalVictory) {
+        document.getElementById('result-icon').innerText = '🏆';
+        document.getElementById('result-title').innerText = '完成所有挑戰！';
+        document.getElementById('result-subtitle').innerText = '您已精通 HKDSE 構造地貌形成過程！';
+        document.getElementById('btn-next-stage').classList.add('hidden');
+      } else {
+        document.getElementById('result-icon').innerText = '🎉';
+        document.getElementById('result-title').innerText = '關卡勝利！';
+        document.getElementById('result-subtitle').innerText = '成功完成此構造地貌形成句子';
+        document.getElementById('btn-next-stage').classList.remove('hidden');
+      }
+
+      document.getElementById('result-modal').classList.remove('hidden');
+    }
+
+    function resetToMenu() {
+      if (timerInterval) clearInterval(timerInterval);
+      gameState = 'START';
+      document.getElementById('result-modal').classList.add('hidden');
+      document.getElementById('hud-bar').classList.add('hidden');
+      document.getElementById('start-modal').classList.remove('hidden');
+    }
+
+    /* LocalStorage Leaderboard Logic */
+    function saveRecordToLeaderboard() {
+      const records = JSON.parse(localStorage.getItem('geo_invader_records') || '[]');
+      let mins = Math.floor(elapsedTime / 60).toString().padStart(2, '0');
+      let secs = (elapsedTime % 60).toString().padStart(2, '0');
+
+      records.push({
+        name: playerName,
+        score: score,
+        timeStr: `${mins}:${secs}`,
+        timestamp: Date.now()
+      });
+
+      // Sort by high score, then lowest time
+      records.sort((a, b) => b.score - a.score || a.timestamp - b.timestamp);
+      localStorage.setItem('geo_invader_records', JSON.stringify(records.slice(0, 20)));
+    }
+
+    function showLeaderboard() {
+      const modal = document.getElementById('leaderboard-modal');
+      const tbody = document.getElementById('leaderboard-rows');
+      const noRecMsg = document.getElementById('no-records-msg');
+
+      const records = JSON.parse(localStorage.getItem('geo_invader_records') || '[]');
+      tbody.innerHTML = '';
+
+      if (records.length === 0) {
+        noRecMsg.classList.remove('hidden');
+      } else {
+        noRecMsg.classList.add('hidden');
+        records.forEach((rec, idx) => {
+          const tr = document.createElement('tr');
+          tr.className = 'hover:bg-slate-800/50 transition-colors';
+          tr.innerHTML = `
+            <td class="p-2 font-bold ${idx === 0 ? 'text-amber-400' : idx === 1 ? 'text-slate-300' : idx === 2 ? 'text-amber-600' : 'text-slate-500'}">
+              ${idx === 0 ? '🥇 1' : idx === 1 ? '🥈 2' : idx === 2 ? '🥉 3' : idx + 1}
+            </td>
+            <td class="p-2 font-bold text-slate-200 truncate max-w-[100px]">${rec.name}</td>
+            <td class="p-2 text-right font-black text-amber-400">${rec.score}</td>
+            <td class="p-2 text-right text-cyan-400 font-mono text-[11px]">${rec.timeStr}</td>
+          `;
+          tbody.appendChild(tr);
+        });
+      }
+
+      modal.classList.remove('hidden');
+    }
+
+    function hideLeaderboard() {
+      document.getElementById('leaderboard-modal').classList.add('hidden');
+    }
+
+    function clearLeaderboard() {
+      if (confirm("確定要清除所有機師英雄榜紀錄嗎？")) {
+        localStorage.removeItem('geo_invader_records');
+        showLeaderboard();
+      }
+    }
+  </script>
+</body>
+</html>
